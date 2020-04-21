@@ -14,11 +14,11 @@ num = 0
 info = []
 
 
-video_capture = cv2.VideoCapture(video_path)
+video_capture = cv2.VideoCapture(video_path) #kkkkkkk
 
 
 def get_video_info():
-    res = []
+    ret = []
 
     major_ver, minor_ver, subminor_ver = cv2.__version__.split('.')
     if int(major_ver) < 3:
@@ -26,10 +26,10 @@ def get_video_info():
     else:
         fps = video_capture.get(cv2.CAP_PROP_FPS)
 
-    res.append(fps)
-    res.append(video_capture.read()[1].shape[0])
-    res.append(video_capture.read()[1].shape[1])
-    return res
+    ret.append(fps)
+    ret.append(video_capture.read()[1].shape[0])
+    ret.append(video_capture.read()[1].shape[1])
+    return ret
 
 
 def outallcapture():
