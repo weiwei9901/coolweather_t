@@ -1,9 +1,9 @@
 import cv2
 import os
-
+# 修改
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-
+# xiugai  zhihoude
 out_path = 'out/'
 quality = 2  # video quality
 video_path = 'test.mp4'
