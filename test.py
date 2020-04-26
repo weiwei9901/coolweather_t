@@ -3,6 +3,7 @@ import os
 # 修改
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from threading import Condition
 # xiugai  zhihoude
 out_path = 'out/'
 quality = 2  # video quality
