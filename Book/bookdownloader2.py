@@ -10,6 +10,8 @@
 '''
 
 import random
+import time
+
 import redis
 # import pymongo
 import requests
@@ -29,7 +31,7 @@ class BookDownload:
     def __init__(self, chapter_link, start_place=0, abbr='http://', proxy=None):
         self.chapter_link = chapter_link  # 目录页面的链接
         self.start_place = start_place  # 第一章在目录中的位置
-        self.abbr_link = chapter_link  # 前缀 链接的前一部分 做了处理 不需要再传了
+        self.abbr_link = chapter_link.rsplit('/',1)[0] + '/'  # 前缀 链接的前一部分 做了处理 不需要再传了
         self.redis_client = redis.Redis()
         self.event = threading.Event()
         self.redis_list = 'url_info'
@@ -39,6 +41,7 @@ class BookDownload:
         # self.mongo_collect = pymongo.MongoClient().chapter_3.test3  # mongodb，自己设置
         self.all_chapter = 0
         self.successed_download = 0
+        self.encoding = None
         self.session = requests.session()
         self.header = {
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'}
@@ -63,14 +66,16 @@ class BookDownload:
         res = self.session.get(self.chapter_link, headers=self.header, timeout=5)
         if res.status_code != 200:
             raise Exception("can't access the website")
+        # print(res.encoding)
+        self.encoding = res.encoding if res.encoding in {'utf8','utf-8','gbk'} else 'utf8'
+        # print(self.encoding)
+        soup = BeautifulSoup(res.content.decode(self.encoding), 'lxml')
+        # print(soup.prettify())
+        name_list = soup.find('div', attrs={'id': 'chapterlist'})
+        # dl_list = name_list.find('dl')
 
-        soup = BeautifulSoup(res.content.decode(), 'lxml')
-        name_list = soup.find('div', attrs={'id': 'list'})
-        dl_list = name_list.find('dl')
-
-        wanted_download = dl_list.find_all('dd')[self.start_place:]
+        wanted_download = name_list.find_all('p')[self.start_place:]
         self.all_chapter = len(wanted_download)
-
         for order, value in enumerate(wanted_download):
             yield order, value.a.get('href').rsplit('/')[-1], value.a.text
 
@@ -93,14 +98,17 @@ class BookDownload:
         """
 
         try:
+
             res = self.session.get(detail_link, proxies=self.proxy, headers=self.header, timeout=timeout)
-            text = res.content.decode()
+            text = res.content.decode(self.encoding)
             soup = BeautifulSoup(text, 'lxml')
-            zhengwen = soup.find('div', attrs={'id': 'content'}).text.replace(r'<br .*?<.*?>', '\n')
+            # print(soup.prettify())
+            zhengwen = soup.find('div', attrs={'id': 'chaptercontent'}).text.replace(r'<br .*?<.*?>', '')
             return zhengwen
         except Exception as e:
-            # raise e
-            return None
+            print(detail_link)
+            raise e
+            # return None
 
     def _clear_redis(self):
         """
@@ -207,21 +215,21 @@ class BookDownload:
         thread.join()
 
     def store_txt(self):
-        txt = 'download.txt'
+        txt = self.chapter_link.split('/')[-2] + '.txt'
 
         # count = self.redis_client.zcard(self.redis_cache)
         while self.redis_client.zcard(self.redis_cache):
             content = ''
             for x in self.redis_client.zrange(self.redis_cache, 0, 1000):
                 content += x.decode() + '\n'
-            with open(txt, 'a+') as f:
+            with open(txt, 'w') as f:
                 f.write(content)
             self.redis_client.zremrangebyrank(self.redis_cache, 0, 1000)
 
 
 if __name__ == '__main__':
-    Pool = ThreadPoolExecutor(15)
-    bookdownload = BookDownload('http://www.xbiquge.la/57/57409/', 0)
+    Pool = ThreadPoolExecutor(10)
+    bookdownload = BookDownload('http://m.xianqihaotianmi.com/book_14852/all.html', 0)
     bookdownload.init_work()
     bookdownload.store_name_in_redis()
     logging.info('=======================start================================')
